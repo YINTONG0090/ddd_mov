@@ -1,0 +1,123 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Oct 11 10:10:39 2021
+
+@author: yintong
+"""
+import time
+import json
+import requests
+from bs4 import BeautifulSoup
+import time
+import pandas as pd
+import random
+import re
+
+headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US; rv:1.9.1.6) Gecko/20091201 Firefox/3.5.6',
+        'Cookie': 'bid=Iv40dFTcAvY; __utmc=30149280; viewed="26284938"; gr_user_id=4d6aa06f-b278-41c2-ac4e-ddd3bcf399d5; ll="118282"; __utmc=223695111; _vwo_uuid_v2=D3FA24BE30DD0353B8AF055C3B2A1EA4C|2295fe3719ad3f59f04bf44eda8c84f5; push_noty_num=0; push_doumail_num=0; __yadk_uid=C4oTIfmf9SNl85NqpHjykMi4DuHiI4we; douban-fav-remind=1; ct=y; __utma=30149280.770632641.1630808903.1633791921.1633918293.16; __utmz=30149280.1633918293.16.8.utmcsr=baidu|utmccn=(organic)|utmcmd=organic; __utma=223695111.1369367869.1633658982.1633791921.1633918293.13; __utmb=223695111.0.10.1633918293; __utmz=223695111.1633918293.13.5.utmcsr=baidu|utmccn=(organic)|utmcmd=organic; _pk_ref.100001.4cf6=%5B%22%22%2C%22%22%2C1633918293%2C%22https%3A%2F%2Fwww.baidu.com%2Flink%3Furl%3DhmgZBbfcAhwjiwTV1zThODhGpDKiqRHPuo5auvFDCVjYSkF4R0SSTqCSej_pEkGY%26wd%3D%26eqid%3Dfae6ea140036b2630000000661639d4f%22%5D; _pk_ses.100001.4cf6=*; dbcl2="248231257:E5dsi3iG4QM"; ck=_dFF; __utmt=1; __utmv=30149280.24823; __gads=ID=cde57bd876af6826:T=1630808901:S=ALNI_MbiUgJTfG-2pWR_cxBi7iJPGhr62A; __utmb=30149280.4.10.1633918293; _pk_id.100001.4cf6=a99c2fe58f2f4b5b.1633658982.13.1633918392.1633792296.'
+    }
+
+time_list = list(range(20))
+
+#years_list = ['1,1959', '1960,1969', '1970,1979', '1980,1989','1990,1999','2000,2009','2010,2019','2019,2019','2020,2020']
+
+def get_douban_data(ip_list,years):
+    ip = random.choice(ip_list)
+    start=0
+    while (1):
+        url = 'https://movie.douban.com/j/new_search_subjects?sort=U&range=0,10&tags=%E7%94%B5%E5%BD%B1&start=' + str(
+                start) + '&year_range=' + years
+        time.sleep(random.choice(time_list))
+        movies = requests.get(url, headers=headers).json()['data']
+        if len(movies) == 0:
+            break
+        start = start + 40
+        yield movies
+
+
+def get_movie_data(movie,years):
+    
+    url=movie['url']
+    title=movie['title'] #名称
+    rate=movie['rate'] #评分
+    directors=movie['directors'] #导演
+    directors='/'.join(directors)  #把所有导演合成一个字符串
+    actors=movie['casts'] #演员
+    actors='/'.join(actors)
+    req=requests.get(url,headers=headers)
+    soup=BeautifulSoup(req.text)
+    
+    genre=""
+    year=""
+    
+    #basic_info=soup.find_all('div',{'id':'info'})
+    try:
+        movie_writers=soup.find_all(class_="attrs")[1].text #编剧
+    except:
+        movie_writers='暂无'
+    try:
+        movie_genre=soup.find_all(property="v:genre") #分类
+        for item in movie_genre:
+            genre+=item.string+"/"
+    except:
+        movie_genre='暂无'
+        genre='暂无'
+    try:
+        movie_year = soup.find_all(property="v:initialReleaseDate")  #年份
+        for item in movie_year:
+            year+=item.string+"/"
+    except:
+        movie_year='暂无'
+        year='暂无'
+    try:
+        movie_runtime=soup.find(property="v:runtime").text #片长
+    except:
+        movie_runtime='暂无'
+    try:
+        intro=soup.find('span',{'property':'v:summary'}).get_text() #剧情介绍
+        intro2=re.sub('\s','',intro).strip()
+    except:
+        intro='暂无'
+        intro2='暂无'
+
+    print("名称："+title)
+    print("评分："+rate)
+    print("导演："+directors)
+    print("编剧："+movie_writers)
+    print("演员："+actors)
+    print("类型："+genre)
+    print("上映年份："+year)
+    print("片长："+movie_runtime)
+    print("剧情："+intro2)
+    print('#######')
+    print('\n')
+
+    one_movie = {"title": title,
+                 "rate":rate,
+                 "directors":directors,
+                 "writers":movie_writers,
+                 "actors":actors,
+                 "genre":genre,
+                 "initialReleaseDate":year,
+                 "runtime":movie_runtime,
+                 "introduction":intro2
+                 }
+
+    with open('D:\douban10.10/movies'+years+'.txt', 'a', encoding='utf-8') as fp:
+        fp.write(json.dumps(one_movie, ensure_ascii=False))
+        fp.write('\n')
+
+
+    
+
+if __name__ == '__main__':
+    ip_list = ['192.168.1.17', '192.168.1.18', '192.168.1.19', '192.168.1.20']
+    years='1,1959'
+    movies = get_douban_data(ip_list,years)
+    #movie_dataframe=pd.DataFrame(columns=['title','rate','directors','casts','writers','genre','year','runtime'])
+    for m in movies:
+        for i in range(len(m)):
+          get_movie_data(m[i],years)
+
